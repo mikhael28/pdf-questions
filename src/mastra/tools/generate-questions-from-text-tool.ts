@@ -15,8 +15,8 @@ export const generateQuestionsFromTextTool = createTool({
     questionCount: z.number().describe('Number of questions generated'),
     success: z.boolean().describe('Whether question generation was successful'),
   }),
-  execute: async ({ context, mastra }) => {
-    const { extractedText, maxQuestions = 10 } = context;
+  execute: async (inputData, { mastra }) => {
+    const { extractedText, maxQuestions = 10 } = inputData;
 
     console.log('❓ Generating questions from extracted text...');
 

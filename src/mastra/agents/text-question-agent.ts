@@ -1,7 +1,7 @@
 import { Agent } from '@mastra/core/agent';
-import { openai } from '@ai-sdk/openai';
 
 export const textQuestionAgent = new Agent({
+  id: 'textQuestionAgent',
   name: 'Generate questions from text agent',
   description: 'An agent specialized in generating comprehensive questions from text',
   instructions: `
@@ -62,5 +62,5 @@ Guidelines:
 
 The questions should help someone thoroughly understand and engage with the source material.
   `,
-  model: openai('gpt-4o'),
+  model: 'openai/gpt-4o',
 });

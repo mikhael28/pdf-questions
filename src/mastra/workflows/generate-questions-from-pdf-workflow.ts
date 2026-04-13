@@ -1,6 +1,7 @@
 import { createStep, createWorkflow } from '@mastra/core/workflows';
 import { z } from 'zod';
-import { RuntimeContext } from '@mastra/core/di';
+import { RequestContext } from '@mastra/core/di';
+import { isValidationError } from '@mastra/core/tools';
 import { pdfFetcherTool } from '../tools/download-pdf-tool';
 import { generateQuestionsFromTextTool } from '../tools/generate-questions-from-text-tool';
 
@@ -27,21 +28,23 @@ const downloadAndSummarizePdfStep = createStep({
   description: 'Downloads PDF from URL and generates an AI summary',
   inputSchema: pdfInputSchema,
   outputSchema: pdfSummarySchema,
-  execute: async ({ inputData, mastra, runtimeContext }) => {
+  execute: async ({ inputData, mastra, requestContext }) => {
     console.log('Executing Step: download-and-summarize-pdf');
     const { pdfUrl } = inputData;
 
-    const result = await pdfFetcherTool.execute({
-      context: { pdfUrl },
-      mastra,
-      runtimeContext: runtimeContext || new RuntimeContext(),
-    });
+    const raw = await pdfFetcherTool.execute!(
+      { pdfUrl },
+      { mastra, requestContext: requestContext ?? new RequestContext() },
+    );
+    if (isValidationError(raw)) {
+      throw new Error(`download-pdf-tool: ${raw.message}`);
+    }
 
     console.log(
-      `Step download-and-summarize-pdf: Succeeded - Downloaded ${result.fileSize} bytes, extracted ${result.characterCount} characters from ${result.pagesCount} pages, generated ${result.summary.length} character summary`,
+      `Step download-and-summarize-pdf: Succeeded - Downloaded ${raw.fileSize} bytes, extracted ${raw.characterCount} characters from ${raw.pagesCount} pages, generated ${raw.summary.length} character summary`,
     );
 
-    return result;
+    return raw;
   },
 });
 
@@ -51,7 +54,7 @@ const generateQuestionsFromSummaryStep = createStep({
   description: 'Generates questions from the AI-generated PDF summary',
   inputSchema: pdfSummarySchema,
   outputSchema: questionsSchema,
-  execute: async ({ inputData, mastra, runtimeContext }) => {
+  execute: async ({ inputData, mastra, requestContext }) => {
     console.log('Executing Step: generate-questions-from-summary');
 
     const { summary } = inputData;
@@ -62,16 +65,19 @@ const generateQuestionsFromSummaryStep = createStep({
     }
 
     try {
-      const result = await generateQuestionsFromTextTool.execute({
-        context: { extractedText: summary }, // Use summary as the text input
-        mastra,
-        runtimeContext: runtimeContext || new RuntimeContext(),
-      });
+      const raw = await generateQuestionsFromTextTool.execute!(
+        { extractedText: summary },
+        { mastra, requestContext: requestContext ?? new RequestContext() },
+      );
+      if (isValidationError(raw)) {
+        console.error('Step generate-questions-from-summary: validation error:', raw.message);
+        return { questions: [], success: false };
+      }
 
       console.log(
-        `Step generate-questions-from-summary: Succeeded - Generated ${result.questions.length} questions from summary`,
+        `Step generate-questions-from-summary: Succeeded - Generated ${raw.questions.length} questions from summary`,
       );
-      return { questions: result.questions, success: result.success };
+      return { questions: raw.questions, success: raw.success };
     } catch (error) {
       console.error('Step generate-questions-from-summary: Failed - Error during generation:', error);
       return { questions: [], success: false };
